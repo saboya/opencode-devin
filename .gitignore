@@ -1,0 +1,28 @@
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Logs and local investigation artifacts
+*.log
+notes/
+captures/
+*.cpuprofile
+*.heapsnapshot
+
+# Local credentials and environment files
+.env
+.env.*
+!.env.example
+credentials.toml
+auth.json
+plugin-auth.json
+*.key
+
+# Machine-local files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

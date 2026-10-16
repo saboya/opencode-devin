@@ -1,0 +1,28 @@
+{
+  "name": "opencode-devin-subscription",
+  "version": "0.1.0",
+  "description": "Use Devin subscription models in the OpenCode V2 agent loop",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "files": ["src"],
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "test:opencode": "tsx scripts/smoke-opencode.ts",
+    "login": "tsx scripts/login.ts",
+    "models": "tsx scripts/models.ts",
+    "probe": "tsx scripts/probe.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/provider": "^3.0.0",
+    "@opencode/plugin": "0.0.0-beta-19507",
+    "ns-devin-core": "0.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.6.0"
+  }
+}
