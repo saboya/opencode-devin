@@ -3,9 +3,9 @@
 Use models from your **Devin subscription** in OpenCode's own agent loop, with
 OpenCode executing local tools. Provider ID: `devin`.
 
-Targets **OpenCode V2 beta**, tested with `opencode2 v0.0.0-beta-19242` and
-`@opencode/plugin@0.0.0-beta-19507`. These builds use `ctx.catalog` and AI SDK
-hooks; newer V2 builds with `ctx.provider` require a plugin API migration.
+Targets **OpenCode V2**, tested with `opencode v2.0.32` and
+`@opencode/plugin@2.0.32`. Provider and model registration uses `ctx.provider`
+transforms; the AI SDK `sdk`/`language` hooks supply the request transport.
 
 ## Setup
 
@@ -84,14 +84,14 @@ export { default } from "/absolute/path/to/opencode-devin/src/index.ts";
 Restart OpenCode after signing in. Pick `devin/<model-id>` using `/models`, or:
 
 ```sh
-opencode2 run --standalone -m devin/<model-id> "Say pong"
+opencode run --standalone -m devin/<model-id> "Say pong"
 ```
 
 For example, if your account lists SWE-2:
 
 ```sh
-opencode2 run --standalone -m devin/swe-2 "Explain this project"
-opencode2 run --standalone -m 'devin/swe-2#high' "Review this project's code"
+opencode run --standalone -m devin/swe-2 "Explain this project"
+opencode run --standalone -m 'devin/swe-2#high' "Review this project's code"
 ```
 
 ## Authentication and options
@@ -136,18 +136,25 @@ though `npm install` completed and standalone runs work, restart the background
 service from a terminal with `DEVIN_SESSION_TOKEN` exported:
 
 ```sh
-opencode2 service restart
-opencode2 service status
+opencode service restart
+opencode service status
 ```
 
-The running beta service can retain failed dependency resolution from when the
+The running service can retain failed dependency resolution from when the
 plugin first appeared before its dependencies were installed. Reloading a session
 or editing the plugin does not clear that process-level state. Reconnect the UI
 after restarting the service.
 
+When the plugin is registered from Git (for example `github:you/opencode-devin`
+in `opencode.json`), OpenCode runs a cached checkout under
+`~/.cache/opencode/npm/git-<repo>-<hash>/<timestamp>/`, not your working copy.
+Edits are only picked up after that cache is refreshed — push the changes and
+reload the plugin, or point the config entry at the local checkout instead. A
+stale cached copy is the usual cause of "errors that were already fixed".
+
 ## Implementation
 
-- `src/index.ts`: V2 beta provider registration and scoped AI SDK hooks.
+- `src/index.ts`: V2 provider registration (`ctx.provider`) and scoped AI SDK hooks.
 - `src/language.ts`: `LanguageModelV3` adapter, streaming and non-streaming output,
   reasoning, tool calls, cancellation, usage, and error mapping.
 - `src/messages.ts`: conversation, local tool results, and inline image conversion.
@@ -171,7 +178,7 @@ settings produce SDK warnings.
 ```sh
 npm run typecheck
 npm test
-npm run test:opencode  # requires opencode2 on PATH; uses a loopback fixture
+npm run test:opencode  # requires opencode on PATH; uses a loopback fixture
 ```
 
 The protocol test exercises real protobuf/Connect framing over loopback, including
@@ -179,8 +186,7 @@ a streamed tool call and its result on the following turn. The OpenCode smoke te
 loads the plugin in an isolated project and uses fake credentials against the same
 kind of fixture. Neither spends subscription quota.
 
-**Status:** typecheck, protocol tests, and the installed OpenCode beta smoke test
-pass. Live testing on 2026-10-16 also passed: environment-token authentication,
+**Status:** typecheck, protocol tests, and the OpenCode v2.0.32 smoke test pass. Live testing on 2026-10-16 also passed: environment-token authentication,
 discovery of 26 account models, SWE-1.6 inference, an OpenCode `pwd` tool round
 trip, and Claude Haiku 5.5 with the `low` effort variant. The short SWE probe
 reported zero token usage; live usage accounting still needs investigation.

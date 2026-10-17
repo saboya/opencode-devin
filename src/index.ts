@@ -35,25 +35,24 @@ export default Plugin.define({
     };
     const registrations: Array<{ dispose(): Promise<void> }> = [];
     try {
-      // The installed V2 beta uses ctx.catalog, as does opencode-droid.
+      // V2 registers providers/models through ctx.provider; the aisdk hooks
+      // below supply the transport for the "devin" provider.
       registrations.push(await ctx.aisdk.hook("sdk", (event) => {
         event.sdk = { languageModel };
       }, { providerID: PROVIDER_ID }));
       registrations.push(await ctx.aisdk.hook("language", (event) => {
         event.language = languageModel(event.model.modelID);
       }, { providerID: PROVIDER_ID }));
-      registrations.push(await ctx.catalog.transform((editor) => {
-        editor.provider.update(PROVIDER_ID, (provider) => {
-          Object.assign(provider, {
+      registrations.push(await ctx.provider.transform((editor) => {
+        editor.add({
+          info: {
             ...Provider.Info.empty(providerID), name: "Devin", activation: "enabled",
             // The sdk/language hooks replace this transport. No credentials are
-            // copied into catalog state or sent through the OpenAI protocol.
+            // copied into provider state or sent through the OpenAI protocol.
             package: "aisdk:@ai-sdk/openai-compatible",
-          });
+          },
+          models: models.map((spec) => toModel(spec)),
         });
-        for (const spec of models) {
-          editor.model.update(PROVIDER_ID, spec.id, (model) => Object.assign(model, toModel(spec)));
-        }
       }));
     } catch (error) {
       for (const registration of registrations.reverse()) await registration.dispose();

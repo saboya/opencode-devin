@@ -41,9 +41,20 @@ try {
   await mkdir(join(directory, ".opencode/plugins"), { recursive: true });
   await writeFile(join(directory, ".opencode/plugins/devin.ts"), `export { default } from ${JSON.stringify(fileURLToPath(new URL("../src/index.ts", import.meta.url)))};\n`);
   await writeFile(join(directory, "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json", plugins: [] }));
-  const child = spawn(process.env.OPENCODE_BIN ?? "opencode2", ["run", "--standalone", "--model", "devin/fixture-model", "Reply with pong."], {
+  // OpenCode derives the project location from PWD, so point it at the fixture
+  // project instead of inheriting the caller's directory. Isolating the home
+  // and XDG directories keeps the user's own plugins and service out of the run.
+  const home = join(directory, "home");
+  await mkdir(home, { recursive: true });
+  const child = spawn(process.env.OPENCODE_BIN ?? "opencode", ["run", "--standalone", "--model", "devin/fixture-model", "Reply with pong."], {
     cwd: directory,
-    env: { ...process.env, DEVIN_SESSION_TOKEN: "devin-session-token$fixture-only", DEVIN_API_SERVER_URL: `http://127.0.0.1:${address.port}` },
+    env: {
+      ...process.env,
+      PWD: directory,
+      OPENCODE: "", OPENCODE_SESSION_ID: "", OPENCODE_TERMINAL: "", AI_AGENT: "",
+      HOME: home, XDG_CONFIG_HOME: join(home, ".config"), XDG_DATA_HOME: join(home, ".local/share"), XDG_CACHE_HOME: join(home, ".cache"),
+      DEVIN_SESSION_TOKEN: "devin-session-token$fixture-only", DEVIN_API_SERVER_URL: `http://127.0.0.1:${address.port}`,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
