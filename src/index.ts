@@ -2,6 +2,7 @@ import { Model, Plugin, Provider } from "@opencode/plugin";
 import type { DevinModelSpec } from "ns-devin-core";
 import { loadModels } from "./catalog.ts";
 import { createDevinLanguageModel } from "./language.ts";
+import { registerFreeTitles } from "./titles.ts";
 
 const PROVIDER_ID = "devin";
 const providerID = Provider.ID.make(PROVIDER_ID);
@@ -35,6 +36,7 @@ export default Plugin.define({
     };
     const registrations: Array<{ dispose(): Promise<void> }> = [];
     try {
+      registrations.push(await registerFreeTitles(ctx));
       // V2 registers providers/models through ctx.provider; the aisdk hooks
       // below supply the transport for the "devin" provider.
       registrations.push(await ctx.aisdk.hook("sdk", (event) => {

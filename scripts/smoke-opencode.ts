@@ -7,14 +7,28 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { create, toBinary, fromBinary, ConnectFrameReader, encodeConnectFrame, devinProto as pb } from "ns-devin-core";
 
-// Offline integration check against an installed OpenCode V2 beta. Every Devin
+// Offline integration check against an installed OpenCode V2. Every Devin
 // request is served by this loopback fixture; no paid credentials are used.
 let chats = 0;
+const requestedModels = new Set<string>();
+let titles = 0;
 const server = createServer(async (req, res) => {
   const reply = (data: Uint8Array) => res.writeHead(200, { "content-type": "application/proto" }).end(data);
-  if (req.url?.endsWith("/GetCliModelConfigs")) {
+  if (req.url === "/v1/chat/completions") {
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    assert.equal(JSON.parse(raw).model, "big-pickle");
+    titles++;
+    res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+      id: "title", object: "chat.completion", created: 1, model: "big-pickle",
+      choices: [{ index: 0, message: { role: "assistant", content: "Fixture title" }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+    }));
+  } else if (req.url?.endsWith("/GetCliModelConfigs")) {
     reply(toBinary(pb.GetCliModelConfigsResponseSchema, create(pb.GetCliModelConfigsResponseSchema, {
-      clientModelConfigs: [create(pb.ClientModelConfigSchema, { modelUid: "fixture-model", label: "Fixture Model", maxTokens: 200_000 })],
+      clientModelConfigs: [
+        create(pb.ClientModelConfigSchema, { modelUid: "fixture-model", label: "Fixture Model", maxTokens: 200_000 }),
+      ],
     })));
   } else if (req.url?.endsWith("/GetUserJwt")) {
     reply(toBinary(pb.GetUserJwtResponseSchema, create(pb.GetUserJwtResponseSchema, { userJwt: "fixture-jwt" })));
@@ -27,6 +41,7 @@ const server = createServer(async (req, res) => {
     const request = fromBinary(pb.GetChatMessageRequestSchema, frame.payload);
     assert.equal(request.metadata?.userJwt, "fixture-jwt");
     assert.equal(request.chatModelUid, "fixture-model");
+    requestedModels.add(request.chatModelUid);
     chats++;
     const message = encodeConnectFrame(toBinary(pb.GetChatMessageResponseSchema, create(pb.GetChatMessageResponseSchema, { deltaText: "pong", stopReason: pb.StopReason.STOP_PATTERN })));
     res.writeHead(200, { "content-type": "application/connect+proto" });
@@ -39,8 +54,17 @@ assert.ok(address && typeof address !== "string");
 const directory = await mkdtemp(join(process.env.OPENCODE_TEST_TMP ?? tmpdir(), "opencode-devin-smoke-"));
 try {
   await mkdir(join(directory, ".opencode/plugins"), { recursive: true });
-  await writeFile(join(directory, ".opencode/plugins/devin.ts"), `export { default } from ${JSON.stringify(fileURLToPath(new URL("../src/index.ts", import.meta.url)))};\n`);
-  await writeFile(join(directory, "opencode.json"), JSON.stringify({ $schema: "https://opencode.ai/config.json", plugins: [] }));
+  await writeFile(join(directory, ".opencode/plugins/devin.ts"), `import plugin from ${JSON.stringify(fileURLToPath(new URL("../src/index.ts", import.meta.url)))};
+export default { ...plugin, async setup(ctx) {
+await ctx.model.transform(editor => editor.update("opencode", "big-pickle", model => {
+model.package = "aisdk:@ai-sdk/openai-compatible";
+model.settings = { baseURL: "http://127.0.0.1:${address.port}/v1", apiKey: "fixture-only" };
+}));
+return plugin.setup(ctx);
+} };\n`);
+  await writeFile(join(directory, "opencode.json"), JSON.stringify({
+    $schema: "https://opencode.ai/config.json", plugins: [],
+  }));
   // OpenCode derives the project location from PWD, so point it at the fixture
   // project instead of inheriting the caller's directory. Isolating the home
   // and XDG directories keeps the user's own plugins and service out of the run.
@@ -66,6 +90,8 @@ try {
     assert.equal(exitCode, 0, output);
     assert.ok(chats > 0, `No request reached the Devin adapter.\n${output}`);
     assert.match(output, /pong/);
+    assert.deepEqual([...requestedModels], ["fixture-model"]);
+    assert.ok(titles > 0, `titles must use the OpenCode free model, not Devin\n${output}`);
     console.log(`OpenCode provider smoke check passed (${chats} fixture inference request(s)).`);
   } finally { clearTimeout(timer); }
 } finally {

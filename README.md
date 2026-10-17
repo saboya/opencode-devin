@@ -154,6 +154,18 @@ stale cached copy is the usual cause of "errors that were already fixed".
 
 ## Implementation
 
+### Session titles
+
+The plugin defaults the hidden `title` agent to a free model from OpenCode's own
+`opencode` provider, not a Devin model. It follows OpenCode 2.0.32's free-model
+preference: Big Pickle, DeepSeek V4.1 Flash Free, GLM-5.3-Flash Free, then Muse
+Spark 1.3 Contributor Free, followed by other available free text models.
+Explicit `agents.title.model` settings take precedence. If no free OpenCode model
+is available at setup, automatic titles are skipped rather than spending Devin
+quota. Restart/reload the plugin to refresh selection. Only title-agent selection
+changes; conversation and compaction models are untouched. This title-agent
+default applies project-wide, including when both plugins are loaded.
+
 - `src/index.ts`: V2 provider registration (`ctx.provider`) and scoped AI SDK hooks.
 - `src/language.ts`: `LanguageModelV3` adapter, streaming and non-streaming output,
   reasoning, tool calls, cancellation, usage, and error mapping.
